@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>브리프체크</title>
+<meta name="description" content="업무 지시에서 빠진 목적·범위·마감·산출물·참고자료를 점검하고 상사에게 보낼 확인 질문을 만들어 주는 신규입사자용 웹앱">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top"><div class="top-in"><button class="logo" id="topLogo" aria-label="브리프체크 처음으로"><span class="logo-mark">B✓</span>브리프체크</button><span class="spacer"></span><button class="ghost" id="topHist">내 브리프</button></div></header>
+<main class="wrap" id="app"></main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
