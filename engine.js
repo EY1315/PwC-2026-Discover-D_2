@@ -82,7 +82,7 @@ var BC = (function () {
       m: { polite: '본 업무의 마감 기한을 언제까지로 생각하고 계신지 여쭙고 싶습니다.',
            friendly: '말씀해주신 업무는 혹시 언제까지 정리해서 드리면 될까요?',
            clear: '마감 기한: (예: 10/10(금) 오전)' },
-      u: { polite: '‘{ev}’라고 말씀해주셨는데, 정확히 몇 일 몇 시까지 보고드리면 되겠습니까?',
+      u: { polite: '‘{ev}’라고 말씀해주셨는데, 정확히 며칠 몇 시까지 보고드리면 되겠습니까?',
            friendly: '‘{ev}’라고 하셨는데, 정확히 무슨 요일 몇 시쯤까지 드리면 될까요?',
            clear: '마감 기한: ‘{ev}’ → 정확한 날짜·시간' } },
     output: {
@@ -247,53 +247,113 @@ var BC = (function () {
       qs.map(function (q) { return '• ' + q; }).join('\n');
   }
 
-  // 직접 쓴 글 다듬기 (규칙 기반)
-  var POLITE_MAP = [
-    [/할게요/g, '하겠습니다'], [/드릴게요/g, '드리겠습니다'], [/될까요\?/g, '되겠습니까?'], [/주실 수 있을까요\?/g, '주실 수 있으신지 여쭙고 싶습니다.'],
-    [/있나요\?/g, '있으십니까?'], [/인가요\?/g, '입니까?'], [/맞나요\?/g, '맞습니까?'], [/주세요/g, '주시면 감사하겠습니다'],
-    [/했어요/g, '했습니다'], [/있어요/g, '있습니다'], [/없어요/g, '없습니다'], [/거예요/g, '것입니다'], [/이에요/g, '입니다'], [/예요/g, '입니다'],
-    [/해요\./g, '합니다.'], [/해요$/gm, '합니다'], [/할까요\?/g, '할지 여쭙고 싶습니다.']
+  // ===== 보내기 전 점검: 오탈자·톤 불일치 → As-is / To-be 제안 (규칙 기반) =====
+  // to: 문자열 또는 { polite, friendly, clear } (톤별 제안), '' 이면 삭제 제안
+  var TYPO = [
+    [/됬/g, '됐', '‘됬’은 ‘됐’의 잘못된 표기예요'],
+    [/(할|드릴|갈|볼|올릴|보낼|챙길|여쭐)께/g, '$1게', '‘-ㄹ께’가 아니라 ‘-ㄹ게’가 맞아요'],
+    [/몇\s?일/g, '며칠', '‘몇 일’이 아니라 ‘며칠’이 맞아요'],
+    [/되요/g, '돼요', '‘되어요’의 준말은 ‘돼요’예요'],
+    [/되서/g, '돼서', '‘되어서’의 준말은 ‘돼서’예요'],
+    [/안되([요는나지겠])/g, '안 되$1', '‘안 되다’는 띄어 써요'],
+    [/안됩니다/g, '안 됩니다', '‘안 되다’는 띄어 써요'],
+    [/뵈요/g, '봬요', '‘뵈어요’의 준말은 ‘봬요’예요'],
+    [/할려고/g, '하려고', '‘할려고’가 아니라 ‘하려고’가 맞아요'],
+    [/할려면/g, '하려면', '‘할려면’이 아니라 ‘하려면’이 맞아요'],
+    [/오랫만/g, '오랜만', '‘오랫만’이 아니라 ‘오랜만’이 맞아요'],
+    [/금새/g, '금세', '‘금새’가 아니라 ‘금세’가 맞아요'],
+    [/왠만하면/g, '웬만하면', '‘왠만하면’이 아니라 ‘웬만하면’이 맞아요'],
+    [/웬지/g, '왠지', '‘웬지’가 아니라 ‘왠지’가 맞아요'],
+    [/일일히/g, '일일이', '‘일일히’가 아니라 ‘일일이’가 맞아요'],
+    [/틈틈히/g, '틈틈이', '‘틈틈히’가 아니라 ‘틈틈이’가 맞아요'],
+    [/꼼꼼이/g, '꼼꼼히', '‘꼼꼼이’가 아니라 ‘꼼꼼히’가 맞아요'],
+    [/역활/g, '역할', '‘역활’이 아니라 ‘역할’이 맞아요'],
+    [/희안/g, '희한', '‘희안’이 아니라 ‘희한’이 맞아요'],
+    [/어떻해/g, '어떡해', '‘어떻해’가 아니라 ‘어떡해’가 맞아요'],
+    [/바래요/g, '바라요', '‘바래요’가 아니라 ‘바라요’가 맞아요'],
+    [/바램/g, '바람', '‘바램’이 아니라 ‘바람’이 맞아요'],
+    [/결제(\s?)(올리|올려|라인|받|요청)/g, '결재$1$2', '승인은 ‘결제(돈 지불)’가 아니라 ‘결재’예요'],
+    [/메세지/g, '메시지', '표준어는 ‘메시지’예요'],
+    [/스케쥴/g, '스케줄', '표준어는 ‘스케줄’이에요']
   ];
-  var FRIENDLY_MAP = [
-    [/하겠습니다/g, '할게요'], [/드리겠습니다/g, '드릴게요'], [/되겠습니까\?/g, '될까요?'], [/입니까\?/g, '인가요?'], [/있으십니까\?/g, '있으세요?'],
-    [/했습니다/g, '했어요'], [/있습니다/g, '있어요'], [/없습니다/g, '없어요'], [/합니다/g, '해요'], [/여쭙고 싶습니다/g, '여쭤봐도 될까요?']
-  ];
-  var BANMAL = /(해\s*줘|줘요?\b|했어(?!요)|할래|뭐야|언제야|맞아\?|해\?|알려\s*줘|보내\s*줘)/;
 
-  function polish(raw, tone, honorific) {
-    var text = (raw || '').trim();
-    var notes = [];
-    var warns = [];
-    if (!text) return { text: '', notes: [], warns: ['다듬을 문장을 입력해 주세요.'] };
-    var before = text;
-    text = text.replace(/[ㅋㅎㅠㅜ]{2,}/g, '').replace(/\^\^|;;+|~{2,}/g, '').replace(/!{2,}/g, '!').replace(/\?{2,}/g, '?');
-    if (text !== before) notes.push('ㅋㅋ·^^·;; 같은 구어 표현을 지웠어요');
-    var map = tone === 'polite' ? POLITE_MAP : tone === 'friendly' ? FRIENDLY_MAP : null;
-    var changed = 0;
-    if (map) map.forEach(function (p) { var n = text.replace(p[0], p[1]); if (n !== text) { changed++; text = n; } });
-    if (changed) notes.push('문장 끝을 ' + (tone === 'polite' ? '하십시오체' : '해요체') + '로 ' + changed + '곳 바꿨어요');
-    var h = (honorific || '').trim() || '매니저님';
-    if (tone === 'clear') {
-      var greet = /^(안녕하세요[^.\n]*[.!]?\s*|바쁘신\s*(?:와중|중)에\s*(?:죄송하지만)?\s*|죄송하지만\s*|혹시\s*)/;
-      var lines = text.replace(new RegExp('^' + h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ',?\\s*'), '')
-        .split(/(?<=[.?!])\s+|\n+/).map(function (s) { return s.replace(greet, '').trim(); }).filter(Boolean);
-      text = h + ', 아래 확인 부탁드립니다.\n' + lines.map(function (l) { return '• ' + l.replace(/^[-•·]\s*/, ''); }).join('\n');
-      notes.push('인사말을 줄이고 ' + lines.length + '개 항목의 개조식으로 바꿨어요');
-    } else if (text.indexOf(h) !== 0 && !/^안녕하세요/.test(text)) {
-      text = h + ', ' + text;
-      notes.push('맨 앞에 호칭(' + h + ')을 넣었어요');
+  var TONE = {
+    polite: [
+      [/할게요/g, '하겠습니다'], [/드릴게요/g, '드리겠습니다'], [/볼게요/g, '보겠습니다'],
+      [/될까요\?/g, '되겠습니까?'], [/할까요\?/g, '할지 여쭙고 싶습니다.'],
+      [/있나요\?/g, '있으십니까?'], [/없나요\?/g, '없으십니까?'], [/되나요\?/g, '됩니까?'], [/맞나요\?/g, '맞습니까?'], [/인가요\?/g, '입니까?'],
+      [/주실 수 있을까요\?/g, '주실 수 있으신지 여쭙고 싶습니다.'],
+      [/주세요/g, '주시면 감사하겠습니다'],
+      [/했어요/g, '했습니다'], [/있어요/g, '있습니다'], [/없어요/g, '없습니다'], [/같아요/g, '같습니다'],
+      [/거예요/g, '것입니다'], [/이에요/g, '입니다'], [/(?<![거이])예요/g, '입니다'],
+      [/해요(?=[.!?\s]|$)/g, '합니다'], [/돼요/g, '됩니다'], [/감사해요/g, '감사합니다']
+    ],
+    friendly: [],
+    clear: [
+      [/바쁘신\s*(?:와중|중)에\s*/g, ''], [/죄송하지만\s*/g, ''], [/혹시\s+/g, '']
+    ]
+  };
+  var TONE_WHY = { polite: '정중한 톤인데 해요체가 섞였어요', clear: '명확한 톤에서는 군더더기 표현을 빼면 좋아요' };
+
+  var COMMON = [
+    [/[ㅋㅎ]{2,}|[ㅠㅜ]{2,}|\^\^|;;+|~{2,}/g, '', '업무 메시지에는 ㅎㅎ·^^·;; 같은 표현을 빼는 게 좋아요', 'tone'],
+    [/(?<![ㄱ-ㅎㅏ-ㅣ])ㄹㅇ(?![ㄱ-ㅎㅏ-ㅣ])/g, '정말', '‘ㄹㅇ’ 같은 초성 줄임말은 업무 메시지에 쓰지 않는 게 좋아요', 'tone'],
+    [/(?<![ㄱ-ㅎㅏ-ㅣ])ㅇㅇ(?![ㄱ-ㅎㅏ-ㅣ])/g, { polite: '네', friendly: '네', clear: '네' }, '‘ㅇㅇ’ 같은 초성 줄임말은 업무 메시지에 쓰지 않는 게 좋아요', 'tone'],
+    [/(?<![ㄱ-ㅎㅏ-ㅣ])ㅇㅋ(?![ㄱ-ㅎㅏ-ㅣ])/g, { polite: '알겠습니다', friendly: '알겠어요', clear: '확인했습니다' }, '‘ㅇㅋ’ 같은 초성 줄임말은 업무 메시지에 쓰지 않는 게 좋아요', 'tone'],
+    [/(?<![ㄱ-ㅎㅏ-ㅣ])ㄱㅅ(?![ㄱ-ㅎㅏ-ㅣ])/g, '감사합니다', '‘ㄱㅅ’ 같은 초성 줄임말은 업무 메시지에 쓰지 않는 게 좋아요', 'tone'],
+    [/(?<![ㄱ-ㅎㅏ-ㅣ])ㅈㅅ(?![ㄱ-ㅎㅏ-ㅣ])/g, '죄송합니다', '‘ㅈㅅ’ 같은 초성 줄임말은 업무 메시지에 쓰지 않는 게 좋아요', 'tone'],
+    [/(?<![ㄱ-ㅎㅏ-ㅣ])ㄴㄴ(?![ㄱ-ㅎㅏ-ㅣ])/g, '아니요', '‘ㄴㄴ’ 같은 초성 줄임말은 업무 메시지에 쓰지 않는 게 좋아요', 'tone'],
+    [/(?<![ㄱ-ㅎㅏ-ㅣ])ㅊㅋ(?![ㄱ-ㅎㅏ-ㅣ])/g, '축하드립니다', '‘ㅊㅋ’ 같은 초성 줄임말은 업무 메시지에 쓰지 않는 게 좋아요', 'tone'],
+    [/(?<![ㄱ-ㅎㅏ-ㅣ])ㅎㅇ(?![ㄱ-ㅎㅏ-ㅣ])/g, '안녕하세요', '‘ㅎㅇ’ 같은 초성 줄임말은 업무 메시지에 쓰지 않는 게 좋아요', 'tone'],
+    [/(?<![ㄱ-ㅎㅏ-ㅣ])ㅂㅂ(?![ㄱ-ㅎㅏ-ㅣ])/g, '감사합니다', '‘ㅂㅂ’ 같은 초성 줄임말은 업무 메시지에 쓰지 않는 게 좋아요', 'tone'],
+    [/(?<![ㄱ-ㅎㅏ-ㅣ])ㅅㄱ(?![ㄱ-ㅎㅏ-ㅣ])/g, '감사합니다', '‘ㅅㄱ’ 같은 초성 줄임말은 업무 메시지에 쓰지 않는 게 좋아요', 'tone'],
+    [/(?<![ㄱ-ㅎㅏ-ㅣ])[ㄱ-ㅎㅏ-ㅣ]{2,}(?![ㄱ-ㅎㅏ-ㅣ])/g, '', '자음·모음만 쓴 줄임말은 상사가 알아보기 어려워요', 'tone'],
+    [/!{2,}/g, '!', '느낌표는 하나면 충분해요', 'tone'],
+    [/\?{2,}/g, '?', '물음표는 하나면 충분해요', 'tone'],
+    [/(해|알려|보내|확인해|말해|정리해)\s?줘(?!요)/g, { polite: '$1 주시기 바랍니다', friendly: '$1 주세요', clear: '$1 주세요' }, '상사에게 반말이 들어갔어요', 'tone'],
+    [/(했|됐|봤)어\?/g, { polite: '$1습니까?', friendly: '$1나요?', clear: '$1나요?' }, '상사에게 반말이 들어갔어요', 'tone'],
+    [/맞아\?/g, { polite: '맞습니까?', friendly: '맞나요?', clear: '맞나요?' }, '상사에게 반말이 들어갔어요', 'tone'],
+    [/언제야\?/g, { polite: '언제입니까?', friendly: '언제인가요?', clear: '언제인가요?' }, '상사에게 반말이 들어갔어요', 'tone'],
+    [/수고하세요|수고하셨습니다/g, { polite: '감사합니다', friendly: '감사합니다', clear: '감사합니다' }, '‘수고하세요’는 윗사람에게 쓰기 어색한 표현이에요', 'tone']
+  ];
+
+  function lint(raw, tone) {
+    var text = raw || '';
+    var out = [], taken = [];
+    function overlaps(s, e) { return taken.some(function (t) { return s < t[1] && t[0] < e; }); }
+    function scan(re, to, why, kind) {
+      re.lastIndex = 0; var m, g = 0;
+      while ((m = re.exec(text)) && g++ < 50) {
+        if (!m[0]) { re.lastIndex++; continue; }
+        var s = m.index, e = s + m[0].length;
+        if (overlaps(s, e)) continue;
+        var rep = typeof to === 'string' ? to : to[tone];
+        if (rep == null) continue;
+        var after = m[0].replace(new RegExp(re.source, re.flags.replace('g', '')), rep);
+        if (after === m[0]) continue;
+        taken.push([s, e]);
+        var hit = out.find(function (o) { return o.from === m[0] && o.to === after; });
+        if (hit) hit.count++; else out.push({ from: m[0], to: after, why: why, kind: kind, count: 1, at: s });
+      }
     }
-    if (tone === 'polite' && !/감사합니다|감사드립니다/.test(text)) { text += '\n\n감사합니다.'; notes.push('끝인사를 붙였어요'); }
-    if (tone === 'friendly' && !/감사합니다|감사해요/.test(text)) { text += '\n\n감사합니다!'; notes.push('끝인사를 붙였어요'); }
-    if (BANMAL.test(raw)) warns.push('반말로 보이는 표현이 있어요. 보내기 전에 확인해 주세요.');
-    if (!/\?|여쭙|부탁|확인/.test(text)) warns.push('질문이나 요청 문장이 없어요. 무엇을 확인하고 싶은지 한 문장 넣어 주세요.');
-    if ((raw.match(/죄송/g) || []).length > 1) warns.push('‘죄송’이 여러 번 나와요. 한 번이면 충분해요.');
-    if (/대충|적당히|아무거나/.test(raw)) warns.push('‘대충·적당히’ 같은 표현은 상사가 오해할 수 있어요.');
-    if (text.length > 400) warns.push('메시지가 깁니다(' + text.length + '자). 핵심 질문만 남겨 보세요.');
-    return { text: text, notes: notes, warns: warns };
+    TYPO.forEach(function (r) { scan(r[0], r[1], r[2], 'typo'); });
+    COMMON.forEach(function (r) { scan(r[0], r[1], r[2], r[3]); });
+    (TONE[tone] || []).forEach(function (r) { scan(r[0], r[1], TONE_WHY[tone], 'tone'); });
+    out.sort(function (a, b) { return a.at - b.at; });
+
+    var warns = [];
+    var t = text.trim();
+    if (t && !/\?|여쭙|부탁|확인|알려/.test(t)) warns.push('질문이나 요청 문장이 없어요. 무엇을 확인하고 싶은지 한 문장 넣어 주세요.');
+    if ((t.match(/죄송/g) || []).length > 1) warns.push('‘죄송’이 여러 번 나와요. 한 번이면 충분해요.');
+    if (/대충|적당히|아무거나/.test(t)) warns.push('‘대충·적당히’ 같은 표현은 상사가 오해할 수 있어요.');
+    if (t.length > 400) warns.push('메시지가 깁니다(' + t.length + '자). 핵심 질문만 남겨 보세요.');
+    return { fixes: out, warns: warns };
   }
 
+  // 제안 하나(또는 전부)를 본문에 적용
+  function applyFix(text, fix) { return text.split(fix.from).join(fix.to).replace(/[ \t]{2,}/g, ' '); }
+
   return { TYPES: TYPES, ITEMS: ITEMS, LEVELS: LEVELS, TODOS: TODOS, SAMPLES: SAMPLES,
-    detectType: detectType, analyze: analyze, judge: judge, itemDef: itemDef, questionFor: questionFor, buildMessage: buildMessage, polish: polish };
+    detectType: detectType, analyze: analyze, judge: judge, itemDef: itemDef, questionFor: questionFor, buildMessage: buildMessage, lint: lint, applyFix: applyFix };
 })();
 if (typeof module !== 'undefined') module.exports = BC;
